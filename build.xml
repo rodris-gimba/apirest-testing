@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="JmeterTest">
+
+  <!-- The ant build script is located in our project's top directory jmeter...          -->
+  <!-- The script is normally started either from command line in directory jmeter or    -->
+  <!-- from within a Jenkins project.                                                    -->
+  <property name="project.root" value="."/>
+  <property name="output.root" value="${project.root}/out"/>
+  <!-- property name="jmeterhome" value="/opt/apps/jmeter/current"/-->
+  <property name="jmeterhome" value="./apache-jmeter-3.1/"/>
+
+
+  <!-- Disclose all defined environment variables to ant.                                -->
+  <property environment="env"/>
+
+  <!-- If either of user root or jenkins started the ant build (in our project)set the   -->
+  <!-- property jenkinsBuild.                                                            -->
+  <!-- The list below can grow with other "jenkins users" when needed.                   -->
+  <condition property="jenkinsBuild">
+    <or>
+      <equals arg1="${env.USER}" arg2="jenkins"/>
+      <equals arg1="${env.USER}" arg2="root"/>
+    </or>
+  </condition>
+
+  <!-- If one of the defined "jenkins users" above started the ant script, here's where  -->
+  <!-- the stylesheetHome variable is set.                                               -->
+  <target name="JenkinsIgnited" if="jenkinsBuild">
+    <property name="stylesheetHome" value="${jmeterhome}/extras"/>
+    <!-- <property name="stylesheetHome" value="${project.root}/extras"/>  -->
+    <!-- property name="stylesheetHome" value="${project.root}/stylesheets"/>  -->
+  </target>
+
+  <!-- Otherwise - if an ordinary user started this script - here's where the            -->
+  <!-- stylesheetHome variable is set.                                                   -->
+  <target name="UserIgnited" unless="jenkinsBuild">
+    <property name="stylesheetHome" value="${jmeterhome}/extras"/>
+  </target>
+
+  <!-- A build target to remove an existing output directory and all its content.        -->
+  <target name="clean">
+    <delete>
+      <fileset dir="${output.root}" includes="*.*"/>
+    </delete>
+    <!-- <delete file="${output.root}/**"/> -->
+  </target>
+
+  <!-- Create the output directory if not already done.                                  -->
+  <!-- Declare the testplan.filename variable to be used when running jmeter.            -->
+  <!-- The declaration MUST have a defined variable TESTLINK_TESTCASE_TESTFILEPATH in    -->
+  <!-- calling environment to know what file to use for test by jmeter.                  -->
+  <!-- Thus, the correct syntax for starting this ant build script from command line is: -->
+  <!-- ant -DGUI=false -DTEST_ENVIRONMENT=2 -DTESTLINK_TESTCASE_TESTFILEPATH=test.jmx    -->
+  <!--     AutoTest                                                                      -->
+  <target name="create-output-directory">
+    <!-- Prepare the out directory.                                                      -->
+    <mkdir dir="${output.root}" />
+
+    <!-- Sort out filename of the testplan.                                              -->
+    <basename property="testplan.filename" file="${test_plan}" suffix=".jmx"/>
+    <echo message="testplan.filename: ${testplan.filename}"/>
+  </target>
+
+  <!-- Define jmeter task. Needed to trigger the ant-jmeter add-on.                      -->
+  <taskdef name="jmeter" classname="org.programmerplanet.ant.taskdefs.jmeter.JMeterTask" classpath="${jmeterhome}/lib/ext/ant-jmeter-1.1.1.jar" />
+
+  <!-- Run the specified JMeter TestPlan file.                                           -->
+  <!-- <target name="AutoTest" depends="create-output-directory,JenkinsIgnited,UserIgnited"> -->
+  <target name="AutoTest" depends="create-output-directory,JenkinsIgnited,UserIgnited">
+    <echo message="Test started by ${env.USER}."/>
+    <jmeter
+      jmeterhome="${jmeterhome}"
+      testplan="${project.root}/testplans/${product}/${testplan.filename}.jmx"
+      resultlog="${output.root}/${testplan.filename}.xml"
+      jmeterlogfile="${output.root}/jmeter.log">
+
+      <property name="server" value="${ipserver}"/>
+
+      <property name="user.classpath" value="${jmeterhome}/lib/ext/ApacheJMeter_core.jar:${jmeterhome}/lib/ext/ApacheJMeter_java.jar"/>
+      <!-- Force suitable defaults                                                       -->
+      <property name="jmeter.save.saveservice.output_format" value="xml"/>
+      <property name="jmeter.save.saveservice.assertion_results" value="all"/>
+      <property name="jmeter.save.saveservice.bytes" value="true"/>
+
+      <property name="GUI" value="false"/>
+      <property name="TEST_ENVIRONMENT" value="${env.TEST_ENVIRONMENT}"/>
+    </jmeter>
+
+    <xslt
+      in="${output.root}/${testplan.filename}.xml"
+      out="${output.root}/${testplan.filename}.html"
+      style="${stylesheetHome}/jmeter-results-detail-report_21.xsl"/>
+  </target>
+</project>
